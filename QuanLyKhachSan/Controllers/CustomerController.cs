@@ -2,11 +2,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Oracle.ManagedDataAccess.Client;
+using Oracle.ManagedDataAccess.Types;
 using QuanLyKhachSan.Models;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace QuanLyKhachSan.Controllers
 {
@@ -22,26 +23,35 @@ namespace QuanLyKhachSan.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetListCustomers(string customerName, string identityCard)
+        public async Task<IActionResult> GetListCustomers(string? customerName, string? identityCard)
         {
             try
             {
                 List<Customer> customers = new List<Customer>();
 
+                // Mở kết nối đến database Oracle
                 using (OracleConnection con = new OracleConnection(_configuration.GetConnectionString("QLKS")))
                 {
                     con.Open();
 
+                    // Tạo đối tượng OracleCommand để thực hiện thủ tục
                     using (OracleCommand cmd = new OracleCommand("GetCustomerPayments", con))
                     {
                         cmd.CommandType = System.Data.CommandType.StoredProcedure;
-                        cmd.Parameters.Add("p_CustomerName", OracleDbType.Varchar2).Value = string.IsNullOrEmpty(customerName) ? "" : customerName;
-                        cmd.Parameters.Add("p_IdentityCard", OracleDbType.Varchar2).Value = string.IsNullOrEmpty(identityCard) ? "" : identityCard;
 
-                        using (OracleDataReader reader = cmd.ExecuteReader())
+                        // Input parameters
+                        cmd.Parameters.Add("p_CustomerName", OracleDbType.Varchar2).Value = customerName != null ? customerName : DBNull.Value;
+                        cmd.Parameters.Add("p_IdentityCard", OracleDbType.Varchar2).Value = identityCard != null ? identityCard : DBNull.Value;
+
+
+                        // Output parameter (ref cursor)
+                        cmd.Parameters.Add("p_CustomerPayments", OracleDbType.RefCursor).Direction = ParameterDirection.Output;
+
+                        using (OracleDataReader reader = (OracleDataReader)await cmd.ExecuteReaderAsync())
                         {
                             while (reader.Read())
                             {
+                                // Create a Customer object and populate its properties from the reader
                                 Customer customer = new Customer
                                 {
                                     CustomerID = reader["CustomerID"].ToString(),
