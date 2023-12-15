@@ -46,9 +46,11 @@ namespace QuanLyKhachSan.Controllers
                             {
                                 Room room = new Room
                                 {
+                                    RoomId = reader["RoomNumber"].ToString(),
                                     RoomNumber = reader["RoomNumber"].ToString(),
                                     Rate = Convert.ToInt32(reader["Rate"]),
                                     RoomCategory = reader["CategoryName"].ToString(),
+                                    Price = Convert.ToDouble(reader["Price"].ToString()),
                                     RoomStatus = Convert.ToInt32(reader["StatusRoom"]),
                                     NumberOfFeedbacks = Convert.ToInt32(reader["NumberOfFeedbacks"])
                                 };

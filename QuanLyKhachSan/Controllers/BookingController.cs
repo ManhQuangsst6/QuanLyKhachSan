@@ -2,10 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Oracle.ManagedDataAccess.Client;
-using Oracle.ManagedDataAccess.Types;
 using QuanLyKhachSan.Models;
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Threading.Tasks;
 
@@ -16,76 +14,100 @@ namespace QuanLyKhachSan.Controllers
     public class BookingController : ControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly string _connectionString;
 
         public BookingController(IConfiguration configuration)
         {
             _configuration = configuration;
+            _connectionString = _configuration.GetConnectionString("QLKS");
         }
 
-        [HttpPost]
-        public async Task<IActionResult> AddBooking([FromBody] BookingRequestModel request)
+        [HttpPost("AddCustomer")]
+        public async Task<IActionResult> AddCustomerAsync(CustomerRequestModel customer)
         {
-            //try
-            //{
-            List<Booking> bookings = new List<Booking>();
-
-            using (OracleConnection con = new OracleConnection(_configuration.GetConnectionString("QLKS")))
+            try
             {
-                con.Open();
-
-                using (OracleCommand cmd = new OracleCommand("AddBooking", con))
+                using (var connection = new OracleConnection(_connectionString))
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
+                    connection.Open();
 
-                    List<string> bookingIDList = new List<string>();
-                    for (int i = 0; i < request.RoomIDs.Count; i++)
+                    using (var command = new OracleCommand("AddCustomer", connection))
                     {
-                        string bookingID = Guid.NewGuid().ToString();
-                        bookingIDList.Add(bookingID);
-                    }
-                    // Định nghĩa và thêm tham số vào cmd
-                    cmd.Parameters.Add("p_BookingIDs", OracleDbType.Array, ParameterDirection.Input).Value = bookingIDList.ToArray();
-                    cmd.Parameters.Add("p_CustomerID", OracleDbType.Varchar2, ParameterDirection.Input).Value = Guid.NewGuid().ToString();
-                    cmd.Parameters.Add("p_FullName", OracleDbType.Varchar2, ParameterDirection.Input).Value = request.FullName;
-                    cmd.Parameters.Add("p_PhoneNumber", OracleDbType.Varchar2, ParameterDirection.Input).Value = request.PhoneNumber;
-                    cmd.Parameters.Add("p_IdentityCard", OracleDbType.Varchar2, ParameterDirection.Input).Value = request.IdentityCard;
-                    cmd.Parameters.Add("p_RoomIDs", OracleDbType.Array, ParameterDirection.Input).Value = request.RoomIDs.ToArray();
-                    cmd.Parameters.Add("p_CheckInDate", OracleDbType.Date, ParameterDirection.Input).Value = request.CheckInDate;
-                    cmd.Parameters.Add("p_CheckOutDate", OracleDbType.Date, ParameterDirection.Input).Value = request.CheckOutDate;
+                        command.CommandType = CommandType.StoredProcedure;
 
-                    // Thêm tham số OUT để nhận dữ liệu trả về
-                    cmd.Parameters.Add("p_BookingInfo", OracleDbType.RefCursor, ParameterDirection.Output);
+                        command.Parameters.Add("p_CustomerID", OracleDbType.Varchar2).Value = Guid.NewGuid().ToString();
+                        command.Parameters.Add("p_FullName", OracleDbType.Varchar2).Value = customer.FullName;
+                        command.Parameters.Add("p_PhoneNumber", OracleDbType.Varchar2).Value = customer.PhoneNumber;
+                        command.Parameters.Add("p_IdentityCard", OracleDbType.Varchar2).Value = customer.IdentityCard;
 
-                    // Thực hiện thủ tục
-                    cmd.ExecuteNonQuery();
-
-                    // Đọc dữ liệu từ cursor
-                    using (OracleDataReader reader = ((OracleRefCursor)cmd.Parameters["p_BookingInfo"].Value).GetDataReader())
-                    {
-                        while (reader.Read())
-                        {
-                            Booking booking = new Booking
-                            {
-                                BookingID = reader["BookingID"].ToString(),
-                                CustomerID = reader["CustomerID"].ToString(),
-                                RoomID = reader["RoomID"].ToString(),
-                                CheckInDate = Convert.ToDateTime(reader["CheckInDate"]),
-                                CheckOutDate = Convert.ToDateTime(reader["CheckOutDate"]),
-                                StatusRoom = Convert.ToInt32(reader["StatusRoom"])
-                            };
-
-                            bookings.Add(booking);
-                        }
+                        await command.ExecuteNonQueryAsync();
                     }
                 }
-            }
 
-            return Ok(bookings);
+                return Ok("Customer added successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error: {ex.Message}");
+            }
         }
-        //catch (Exception ex)
-        //{
-        //    return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
-        //}
-        //}
+
+        [HttpPost("UpdateStatusRoom")]
+        public async Task<IActionResult> UpdateStatusRoomAsync(string roomID)
+        {
+            try
+            {
+                using (var connection = new OracleConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (var command = new OracleCommand("UpdateStatusRoom", connection))
+                    {
+                        command.CommandType = CommandType.StoredProcedure;
+
+                        command.Parameters.Add("p_RoomID", OracleDbType.Varchar2).Value = roomID;
+
+                        await command.ExecuteNonQueryAsync();
+                    }
+                }
+
+                return Ok("Room status updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error: {ex.Message}");
+            }
+        }
+
+        [HttpPost("AddBooking")]
+        public async Task<IActionResult> AddBookingAsync(BookingRequestModel booking)
+        {
+            try
+            {
+                using (var connection = new OracleConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (var command = new OracleCommand("AddBooking", connection))
+                    {
+                        command.CommandType = CommandType.StoredProcedure;
+
+                        command.Parameters.Add("p_BookingID", OracleDbType.Varchar2).Value = Guid.NewGuid().ToString();
+                        command.Parameters.Add("p_CustomerID", OracleDbType.Varchar2).Value = booking.CustomerID;
+                        command.Parameters.Add("p_RoomID", OracleDbType.Varchar2).Value = booking.RoomID;
+                        command.Parameters.Add("p_CheckInDate", OracleDbType.Date).Value = booking.CheckInDate;
+                        command.Parameters.Add("p_CheckOutDate", OracleDbType.Date).Value = booking.CheckOutDate;
+
+                        await command.ExecuteNonQueryAsync();
+                    }
+                }
+
+                return Ok("Booking added successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error: {ex.Message}");
+            }
+        }
     }
 }
